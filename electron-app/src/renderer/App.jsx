@@ -19,6 +19,13 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingError, setProcessingError] = useState(null);
 
+  // Additional tool state
+  const [genFillPrompt, setGenFillPrompt] = useState('');
+  const [genFillMask, setGenFillMask] = useState(null);
+  const [cleanupMask, setCleanupMask] = useState(null);
+  const [upscaleFactor, setUpscaleFactor] = useState(2);
+  const [extractedText, setExtractedText] = useState('');
+
   const imageRef = useRef(null); // To get natural dimensions of the previewed image
 
   const handleToolChange = (toolName) => {
@@ -145,21 +152,128 @@ function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error during resize." }));
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error during resize.' }));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const imageBlob = await response.blob();
       const newImagePreviewUrl = URL.createObjectURL(imageBlob);
-      setImagePreviewUrl(newImagePreviewUrl); // Update preview with resized image
-      // Update selectedImage to the new blob if further operations are on the resized version
-      // This might require changing how selectedImage is handled or introducing a 'processedImageBlob' state
-      // For now, just updating the preview.
-      // setSelectedImage(new File([imageBlob], selectedImage.name, { type: imageBlob.type }));
-
+      setImagePreviewUrl(newImagePreviewUrl);
     } catch (error) {
-      console.error("Failed to resize image:", error);
-      setProcessingError(error.message || "Failed to resize image.");
+      console.warn('Remote resize failed, trying local:', error);
+      try {
+        const result = await window.backend.resizeImageLocal({
+          imagePath: selectedImage.path,
+          width: newWidth,
+          height: newHeight,
+          expand: expandImage,
+        });
+        if (result.image) {
+          setImagePreviewUrl(`data:image/png;base64,${result.image}`);
+        } else if (result.output) {
+          setImagePreviewUrl(`data:image/png;base64,${result.output}`);
+        }
+      } catch (err) {
+        console.error('Failed to resize locally:', err);
+        setProcessingError(err.message || 'Failed to resize image.');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleGenerativeFill = async () => {
+    if (!selectedImage || !genFillPrompt) return;
+    setIsProcessing(true);
+    setProcessingError(null);
+    try {
+      const result = await window.backend.generativeFill({
+        imagePath: selectedImage.path,
+        prompt: genFillPrompt,
+        maskPath: genFillMask ? genFillMask.path : null,
+      });
+      if (result.image) {
+        setImagePreviewUrl(`data:image/png;base64,${result.image}`);
+      }
+    } catch (err) {
+      console.error('Generative fill failed:', err);
+      setProcessingError(err.message || 'Generative fill failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRemoveBg = async () => {
+    if (!selectedImage) return;
+    setIsProcessing(true);
+    setProcessingError(null);
+    try {
+      const result = await window.backend.removeBg({ imagePath: selectedImage.path });
+      if (result.image) {
+        setImagePreviewUrl(`data:image/png;base64,${result.image}`);
+      }
+    } catch (err) {
+      console.error('Remove BG failed:', err);
+      setProcessingError(err.message || 'Remove BG failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    if (!selectedImage || !cleanupMask) return;
+    setIsProcessing(true);
+    setProcessingError(null);
+    try {
+      const result = await window.backend.cleanup({
+        imagePath: selectedImage.path,
+        maskPath: cleanupMask.path,
+      });
+      if (result.image) {
+        setImagePreviewUrl(`data:image/png;base64,${result.image}`);
+      }
+    } catch (err) {
+      console.error('Cleanup failed:', err);
+      setProcessingError(err.message || 'Cleanup failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpscale = async () => {
+    if (!selectedImage) return;
+    setIsProcessing(true);
+    setProcessingError(null);
+    try {
+      const result = await window.backend.upscale({
+        imagePath: selectedImage.path,
+        scale: upscaleFactor,
+      });
+      if (result.image) {
+        setImagePreviewUrl(`data:image/png;base64,${result.image}`);
+      }
+    } catch (err) {
+      console.error('Upscale failed:', err);
+      setProcessingError(err.message || 'Upscale failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExtractText = async () => {
+    if (!selectedImage) return;
+    setIsProcessing(true);
+    setProcessingError(null);
+    try {
+      const result = await window.backend.extractText({ imagePath: selectedImage.path });
+      if (result.text) {
+        setExtractedText(result.text);
+      } else if (result.output) {
+        setExtractedText(result.output);
+      }
+    } catch (err) {
+      console.error('Extract text failed:', err);
+      setProcessingError(err.message || 'Extract text failed');
     } finally {
       setIsProcessing(false);
     }
@@ -230,13 +344,86 @@ function App() {
                 <div>Scale Slider Placeholder</div>
             </>
         )
+      case 'Generative Fill':
+        return (
+          <div className="gen-fill-controls">
+            <input
+              type="text"
+              placeholder="Prompt"
+              value={genFillPrompt}
+              onChange={(e) => setGenFillPrompt(e.target.value)}
+              disabled={isProcessing}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setGenFillMask(e.target.files[0] || null)}
+              disabled={isProcessing}
+            />
+            <button onClick={handleGenerativeFill} disabled={isProcessing || !genFillPrompt}>
+              {isProcessing ? 'Processing...' : 'Apply'}
+            </button>
+            {processingError && <p style={{color: '#ff7777', marginTop: '5px'}}>{processingError}</p>}
+          </div>
+        );
+      case 'Remove BG':
+        return (
+          <div className="remove-bg-controls">
+            <button onClick={handleRemoveBg} disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Remove Background'}
+            </button>
+            {processingError && <p style={{color: '#ff7777', marginTop: '5px'}}>{processingError}</p>}
+          </div>
+        );
+      case 'Cleanup':
+        return (
+          <div className="cleanup-controls">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setCleanupMask(e.target.files[0] || null)}
+              disabled={isProcessing}
+            />
+            <button onClick={handleCleanup} disabled={isProcessing || !cleanupMask}>
+              {isProcessing ? 'Processing...' : 'Cleanup'}
+            </button>
+            {processingError && <p style={{color: '#ff7777', marginTop: '5px'}}>{processingError}</p>}
+          </div>
+        );
+      case 'Upscale':
+        return (
+          <div className="upscale-controls">
+            <input
+              type="number"
+              value={upscaleFactor}
+              min="1"
+              max="4"
+              onChange={(e) => setUpscaleFactor(e.target.value)}
+              disabled={isProcessing}
+            />
+            <button onClick={handleUpscale} disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Upscale'}
+            </button>
+            {processingError && <p style={{color: '#ff7777', marginTop: '5px'}}>{processingError}</p>}
+          </div>
+        );
+      case 'Extract Text':
+        return (
+          <div className="ocr-controls">
+            <button onClick={handleExtractText} disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Extract Text'}
+            </button>
+            {extractedText && <textarea value={extractedText} readOnly rows={4} style={{width: '100%', marginTop:'5px'}} />}
+            {processingError && <p style={{color: '#ff7777', marginTop: '5px'}}>{processingError}</p>}
+          </div>
+        );
       // Add cases for other tools here
       default:
         return <p>{activeTool} options will appear here.</p>;
     }
   };
 
-  const sidebarTools = ['Crop', 'Filter', 'Finetune', 'Redact', 'Annotate', 'Frame', 'Resize'];
+  const sidebarTools = ['Crop', 'Filter', 'Finetune', 'Redact', 'Annotate', 'Frame', 'Resize', 'Generative Fill', 'Remove BG', 'Cleanup', 'Upscale', 'Extract Text'];
 
   return (
     <div className="editor-container">
