@@ -1,0 +1,27 @@
+{
+  "name": "imgpop-electron-react",
+  "version": "0.1.0",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev:react": "vite",
+    "build:react": "vite build",
+    "dev": "cross-env NODE_ENV=development concurrently \"npm:dev:react\" \"wait-on http://localhost:5173 && electron .\"",
+    "start:electron-dev": "cross-env NODE_ENV=development wait-on http://localhost:5173 && electron .",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "electron": "^28.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.9.1",
+    "vite": "^5.0.12",
+    "wait-on": "^7.2.0"
+  }
+} 

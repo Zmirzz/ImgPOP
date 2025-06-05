@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./python-ai-backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./python-ai-backend:/app
+    environment:
+      - FLASK_ENV=development # Ensures Flask runs in development mode for auto-reloading
+
+  frontend:
+    build:
+      context: ./electron-app
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./electron-app:/app # Mount the app code
+      - /app/node_modules # Anonymous volume to prevent host node_modules from overwriting container's
+    # If you have specific environment variables for Vite/React, add them here:
+    # environment:
+    #   - VITE_SOME_VARIABLE=value
+
+networks:
+  default:
+    driver: bridge 
