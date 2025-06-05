@@ -9,8 +9,15 @@ services:
       - "5001:5001"
     volumes:
       - ./python-ai-backend:/app
+      - hf-cache:/root/.cache/huggingface
     environment:
       - FLASK_ENV=development # Ensures Flask runs in development mode for auto-reloading
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
 
   frontend:
     build:
@@ -27,4 +34,7 @@ services:
 
 networks:
   default:
-    driver: bridge 
+    driver: bridge
+volumes:
+  hf-cache:
+
