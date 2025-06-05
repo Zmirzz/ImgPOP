@@ -2,7 +2,7 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('backend', {
+contextBridge.exposeInMainWorld('electronAPI', {
   generativeFill: (opts) => ipcRenderer.invoke('generative-fill', opts),
   removeBg: (opts) => ipcRenderer.invoke('remove-bg', opts),
   cleanup: (opts) => ipcRenderer.invoke('cleanup', opts),
