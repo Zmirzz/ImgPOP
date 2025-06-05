@@ -1,7 +1,8 @@
 from flask import Flask, jsonify, request, send_file
-from flask_cors import CORS # Import CORS
+from flask_cors import CORS
 from PIL import Image
 import io
+from ai_tools import expand_image
 
 app = Flask(__name__)
 CORS(app) # Initialize CORS with default settings (allow all origins)
@@ -24,7 +25,7 @@ def resize_image():
     try:
         new_width = int(request.form.get('width'))
         new_height = int(request.form.get('height'))
-        # expand = request.form.get('expand', 'false').lower() == 'true' # We'll use this later
+        expand = request.form.get('expand', 'false').lower() == 'true'
     except (TypeError, ValueError) as e:
         return jsonify({"error": "Invalid width or height provided. Must be integers."}), 400
 
@@ -33,9 +34,14 @@ def resize_image():
 
     try:
         img = Image.open(file.stream)
-        original_format = img.format or 'PNG' # Keep original format if possible
+        original_format = img.format or 'PNG'
 
-        # For now, simple resize. "Expand" logic will be added later.
+        if expand and (new_width > img.width or new_height > img.height):
+            try:
+                img = expand_image(img, new_width, new_height)
+            except Exception as exp_err:
+                return jsonify({"error": str(exp_err)}), 500
+
         resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
         byte_arr = io.BytesIO()
