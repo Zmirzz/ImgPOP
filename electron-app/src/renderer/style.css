@@ -5,23 +5,289 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #282c34;
-  color: white;
+  background-color: #1e1e1e; /* Darker background for the body */
+  color: #e0e0e0; /* Lighter text color for better contrast */
+  overflow: hidden; /* Prevent body scrollbars */
 }
 
 #root {
-  text-align: center;
+  height: 100vh;
+  display: flex;
 }
 
-.App-header {
-  min-height: 100vh;
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #252526; /* Editor background color from reference */
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #333333; /* Darker shade for top bar */
+  border-bottom: 1px solid #444444;
+  height: 40px; /* Approximate height from image */
+  box-sizing: border-box;
+}
+
+.top-bar-left, .top-bar-center, .top-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.top-bar-center {
+  flex-grow: 1;
+  justify-content: center;
+  color: #cccccc;
+}
+
+.main-content-area {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden; /* Prevent internal scrollbars if content overflows */
+}
+
+.left-sidebar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  padding: 10px 5px;
+  background-color: #2a2d2e; /* Sidebar color from reference */
+  width: 60px; /* Approximate width from image */
+  border-right: 1px solid #444444;
+  box-sizing: border-box;
 }
 
+.image-display-area {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column; /* To stack image load and preview */
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background-color: #252526; /* Match editor background */
+  overflow: auto; /* Allow scroll if image is very large */
+  position: relative; /* For positioning controls like temporary resize */
+}
+
+.image-load-section {
+  padding: 20px;
+  border: 2px dashed #4a4a4a;
+  border-radius: 8px;
+  text-align: center;
+  background-color: #2f2f2f;
+}
+
+.image-load-section h2 {
+  margin-top: 0;
+  color: #cccccc;
+}
+
+.image-load-section input[type="file"] {
+  margin-top: 10px;
+}
+
+.image-preview-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.main-image-preview {
+  max-width: 100%;
+  max-height: 100%; /* Was calc(100vh - 200px) - now constrained by parent */
+  object-fit: contain;
+  border: 1px solid #1a1a1a; /* Subtle border for the image */
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+.bottom-bar {
+  display: flex;
+  justify-content: center; /* Center content by default */
+  align-items: center;
+  padding: 10px;
+  background-color: #333333;
+  border-top: 1px solid #444444;
+  min-height: 60px; /* Ensure a minimum height */
+  height: auto; /* Allow height to grow if content is larger */
+  box-sizing: border-box;
+  color: #cccccc;
+}
+
+.bottom-bar > div { /* Direct children, like resize controls container */
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Spacing between elements in the bottom bar */
+}
+
+.bottom-bar .resize-controls-temporary {
+  position: static; /* Override absolute positioning */
+  box-shadow: none; /* Remove shadow as it's part of the bar now */
+  background-color: transparent; /* Inherit bottom bar background */
+  border: none; /* No border needed inside the bar */
+  padding: 0; /* Remove padding, rely on parent's padding */
+  display: flex; /* Arrange controls horizontally */
+  flex-wrap: wrap; /* Allow wrapping if not enough space */
+  align-items: center;
+  gap: 10px; /* Space out controls */
+  color: #e0e0e0; /* Ensure text is visible */
+}
+
+.bottom-bar .resize-controls-temporary h3 {
+  margin: 0 10px 0 0;
+  font-size: 0.9em;
+  font-weight: normal;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.bottom-bar .resize-controls-temporary div {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.bottom-bar .resize-controls-temporary label {
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.bottom-bar .resize-controls-temporary input[type="number"] {
+  width: 55px;
+  padding: 3px;
+}
+
+.bottom-bar .resize-controls-temporary button {
+  margin-top: 0; /* Remove top margin */
+  padding: 5px 10px;
+}
+
+.bottom-bar .resize-controls-temporary p {
+    margin: 0;
+}
+
+.top-bar-center .tool-button {
+    margin: 0 3px; /* Spacing for context buttons in top bar */
+    padding: 5px 8px;
+    font-size: 0.85em;
+}
+
+/* Button Styles */
+.tool-button, .action-button {
+  background-color: #3c3c3c;
+  color: #e0e0e0;
+  border: 1px solid #555555;
+  padding: 8px 10px;
+  margin: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.tool-button:hover, .action-button:hover {
+  background-color: #4a4a4a;
+  border-color: #666666;
+}
+
+.left-sidebar .tool-button {
+  width: 100%;
+  padding: 10px 5px; /* More vertical padding for sidebar buttons */
+  margin: 5px 0;
+  text-align: center;
+}
+
+.left-sidebar .tool-button.active {
+  background-color: #007acc; /* Highlight color for active button */
+  border-color: #005a99;
+  color: #ffffff;
+}
+
+.icon-button {
+  /* Styles for buttons that would ideally be icons */
+  /* For now, text placeholders are used. We might replace with SVGs later. */
+  font-weight: bold;
+  min-width: 30px;
+}
+
+.save-button {
+  background-color: #007acc; /* A distinct color for save */
+  border-color: #005a99;
+}
+
+.save-button:hover {
+  background-color: #005a99;
+  border-color: #004377;
+}
+
+/* Utility classes from old App.jsx - can be removed if not used elsewhere */
 .App-link {
   color: #61dafb;
+}
+
+/* Styles for temporary resize controls - copied and adapted from inline */
+.resize-controls-temporary {
+  padding: 15px;
+  border: 1px solid #4a4a4a;
+  border-radius: 6px;
+  background-color: #2c2c2e; /* Slightly different from sidebar */
+  position: absolute;
+  bottom: 70px; /* Above bottom bar */
+  left: 70px; /* To the right of sidebar */
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  color: #d0d0d0;
+}
+
+.resize-controls-temporary h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1em;
+  color: #ffffff;
+}
+
+.resize-controls-temporary label {
+  margin-right: 5px;
+  font-size: 0.9em;
+}
+.resize-controls-temporary input[type="number"] {
+  width: 60px;
+  padding: 4px;
+  background-color: #3a3a3a;
+  border: 1px solid #555;
+  color: #e0e0e0;
+  border-radius: 3px;
+}
+
+.resize-controls-temporary input[type="checkbox"] {
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.resize-controls-temporary button {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background-color: #007acc;
+  border-color: #005a99;
+  color: white;
+}
+
+.resize-controls-temporary button:hover {
+  background-color: #005a99;
+}
+
+.resize-controls-temporary p {
+  font-size: 0.85em;
+  color: #cccccc;
+}
+
+.resize-controls-temporary p[style*="color: #ff7777"] { /* Error message */
+  color: #ff7777 !important; 
+  font-weight: bold;
 } 

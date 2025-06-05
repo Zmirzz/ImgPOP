@@ -7,7 +7,10 @@ function App() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
 
-  // Resizer state
+  // Editor state
+  const [activeTool, setActiveTool] = useState('Crop'); // Default tool
+
+  // Resizer state (will be managed by Resize tool)
   const [originalDimensions, setOriginalDimensions] = useState(null); // { width, height }
   const [newWidth, setNewWidth] = useState('');
   const [newHeight, setNewHeight] = useState('');
@@ -17,6 +20,14 @@ function App() {
   const [processingError, setProcessingError] = useState(null);
 
   const imageRef = useRef(null); // To get natural dimensions of the previewed image
+
+  const handleToolChange = (toolName) => {
+    setActiveTool(toolName);
+    // Reset or set up tool-specific states here if needed in the future
+    if (toolName !== 'Resize') {
+        setProcessingError(null); // Clear resize errors when switching away
+    }
+  };
 
   const handlePingBackend = async () => {
     setPingResponse('Pinging...');
@@ -44,10 +55,13 @@ function App() {
       reader.onloadend = () => {
         setSelectedImage(file);
         setImagePreviewUrl(reader.result);
-        setNewWidth('');
+        setNewWidth(''); // Reset dimensions for new image
         setNewHeight('');
-        setOriginalDimensions(null);
+        setOriginalDimensions(null); // Will be set onImageLoad
         setProcessingError(null);
+        // If an image is loaded, and no tool is selected, or a tool that needs an image is selected
+        // you might want to set a default tool or ensure current tool is appropriate.
+        // For now, just loading the image.
       };
       reader.readAsDataURL(file);
     } else {
@@ -64,10 +78,9 @@ function App() {
     if (imageRef.current) {
       const { naturalWidth, naturalHeight } = imageRef.current;
       setOriginalDimensions({ width: naturalWidth, height: naturalHeight });
-      if (newWidth === '' || newHeight === '') {
-        setNewWidth(naturalWidth.toString());
-        setNewHeight(naturalHeight.toString());
-      }
+      // Set initial dimensions for resize tool if it's active or becomes active
+      setNewWidth(naturalWidth.toString());
+      setNewHeight(naturalHeight.toString());
     }
   };
 
@@ -137,7 +150,12 @@ function App() {
       }
 
       const imageBlob = await response.blob();
-      setImagePreviewUrl(URL.createObjectURL(imageBlob));
+      const newImagePreviewUrl = URL.createObjectURL(imageBlob);
+      setImagePreviewUrl(newImagePreviewUrl); // Update preview with resized image
+      // Update selectedImage to the new blob if further operations are on the resized version
+      // This might require changing how selectedImage is handled or introducing a 'processedImageBlob' state
+      // For now, just updating the preview.
+      // setSelectedImage(new File([imageBlob], selectedImage.name, { type: imageBlob.type }));
 
     } catch (error) {
       console.error("Failed to resize image:", error);
@@ -147,98 +165,141 @@ function App() {
     }
   };
 
-  return (
-    <div className="App">
-      <header className="App-header">
-        <h1>ImgPOP - AI Image Editor</h1>
+  const renderTopBarCenterContent = () => {
+    if (!selectedImage) return null;
+    switch (activeTool) {
+      case 'Crop':
+        return (
+          <>
+            <button className="tool-button">Rotate Left</button>
+            <button className="tool-button">Flip Horizontal</button>
+            <button className="tool-button">Crop Shape</button>
+          </>
+        );
+      // Add cases for other tools here
+      default:
+        return <span>{activeTool} Controls</span>;
+    }
+  };
 
-        <div style={{ margin: '20px 0', padding: '10px', border: '1px solid #555', borderRadius: '5px', opacity: isProcessing ? 0.7 : 1 }}>
-          <h2>1. Load Image</h2>
-          <input type="file" accept="image/*" onChange={handleImageChange} disabled={isProcessing} />
-          {imagePreviewUrl && (
-            <div style={{ marginTop: '20px' }}>
-              <h3>Preview:</h3>
-              <img 
-                ref={imageRef} 
-                src={imagePreviewUrl} 
-                alt="Selected Preview" 
-                style={{ maxWidth: '300px', maxHeight: '300px', border: '1px solid #ccc' }} 
-                onLoad={onImageLoad}
-              />
-              {originalDimensions && (
-                <p>Original Dim: {originalDimensions.width} x {originalDimensions.height}</p>
-              )}
-            </div>
-          )}
-        </div>
+ const renderBottomBarContent = () => {
+    if (!selectedImage) return <p>Please load an image to enable tools.</p>;
 
-        <hr style={{margin: '20px 0', width: '80%'}}/>
-
-        {selectedImage && originalDimensions && (
-          <div style={{ margin: '20px 0', padding: '10px', border: '1px solid #555', borderRadius: '5px', opacity: isProcessing ? 0.7 : 1 }}>
-            <h2>2. Resize Image</h2>
+    switch (activeTool) {
+      case 'Resize':
+        return (
+          <div className="resize-controls-temporary"> {/* Use the class for styling */}
+            <h3>Resize Image</h3>
+            {originalDimensions && (<p>Original: {originalDimensions.width} x {originalDimensions.height}</p>)}
             <div>
-              <label htmlFor="width">Width: </label>
-              <input type="number" id="width" value={newWidth} onChange={handleWidthChange} style={{width: "70px"}} disabled={isProcessing}/>
-              <label htmlFor="height" style={{marginLeft: "10px"}}>Height: </label>
-              <input type="number" id="height" value={newHeight} onChange={handleHeightChange} style={{width: "70px"}} disabled={isProcessing}/>
+              <label htmlFor="width">W: </label>
+              <input type="number" id="width" value={newWidth} onChange={handleWidthChange} disabled={isProcessing || !originalDimensions}/>
+              <label htmlFor="height" style={{marginLeft: "10px"}}>H: </label>
+              <input type="number" id="height" value={newHeight} onChange={handleHeightChange} disabled={isProcessing || !originalDimensions}/>
             </div>
-            <div style={{marginTop: "10px"}}>
-              <input 
-                type="checkbox" 
-                id="aspectRatio" 
-                checked={maintainAspectRatio} 
-                onChange={handleAspectRatioToggle} 
-                disabled={isProcessing}
+            <div style={{marginTop: "5px", fontSize: '0.9em'}}>
+              <input
+                type="checkbox"
+                id="aspectRatio"
+                checked={maintainAspectRatio}
+                onChange={handleAspectRatioToggle}
+                disabled={isProcessing || !originalDimensions}
               />
-              <label htmlFor="aspectRatio">Maintain aspect ratio</label>
+              <label htmlFor="aspectRatio">Lock Aspect</label>
             </div>
-            <div style={{marginTop: "10px"}}>
-              <input 
-                type="checkbox" 
-                id="expand" 
-                checked={expandImage} 
-                onChange={(e) => setExpandImage(e.target.checked)} 
-                disabled={isProcessing}
+            <div style={{marginTop: "5px", fontSize: '0.9em'}}>
+              <input
+                type="checkbox"
+                id="expand"
+                checked={expandImage}
+                onChange={(e) => setExpandImage(e.target.checked)}
+                disabled={isProcessing || !originalDimensions}
               />
-              <label htmlFor="expand">Expand canvas if new dimensions are larger</label>
+              <label htmlFor="expand">Expand canvas</label>
             </div>
-            <button onClick={handleApplyResize} style={{marginTop: "15px"}} disabled={isProcessing}>
+            <button onClick={handleApplyResize} style={{marginTop: "10px"}} disabled={isProcessing || !originalDimensions}>
               {isProcessing ? 'Processing...' : 'Apply Resize'}
             </button>
-            {processingError && <p style={{color: '#ff7777', marginTop: '10px'}}>{processingError}</p>}
+            {processingError && <p style={{color: '#ff7777', marginTop: '5px'}}>{processingError}</p>}
           </div>
-        )}
+        );
+      case 'Crop':
+        return (
+            <>
+                <div style={{marginRight: '20px'}}>Rotation Slider Placeholder</div>
+                <div>Scale Slider Placeholder</div>
+            </>
+        )
+      // Add cases for other tools here
+      default:
+        return <p>{activeTool} options will appear here.</p>;
+    }
+  };
 
-        <hr style={{margin: '20px 0', width: '80%'}}/>
+  const sidebarTools = ['Crop', 'Filter', 'Finetune', 'Redact', 'Annotate', 'Frame', 'Resize'];
 
-        <div style={{ opacity: isProcessing ? 0.7 : 1 }}>
-          <h2>Backend Communication Test:</h2>
-          <button onClick={handlePingBackend} disabled={isProcessing}>Ping Python Backend</button>
-          <p>Response: <strong>{pingResponse}</strong></p>
-          {pingError && <p style={{color: 'red'}}>Error: {pingError}</p>}
+  return (
+    <div className="editor-container">
+      <div className="top-bar">
+        <div className="top-bar-left">
+          <button className="tool-button icon-button">X</button>
+          <button className="tool-button icon-button">{'<='}</button>
+          <button className="tool-button icon-button">{'=>'}</button>
+        </div>
+        <div className="top-bar-center">
+          {renderTopBarCenterContent()}
+        </div>
+        <div className="top-bar-right">
+          <button className="action-button save-button">Save and close</button>
+        </div>
+      </div>
+
+      <div className="main-content-area">
+        <div className="left-sidebar">
+          {sidebarTools.map(tool => (
+            <button 
+              key={tool}
+              className={`tool-button ${activeTool === tool ? 'active' : ''}`}
+              onClick={() => handleToolChange(tool)}
+            >
+              {tool}
+            </button>
+          ))}
         </div>
 
-        <hr style={{margin: '20px 0', width: '50%'}}/>
+        <div className="image-display-area">
+          {!imagePreviewUrl && (
+            <div className="image-load-section">
+              <h2>Load Image</h2>
+              <input type="file" accept="image/*" onChange={handleImageChange} disabled={isProcessing} />
+            </div>
+          )}
 
-        <p style={{ opacity: isProcessing ? 0.7 : 1 }}>
-          <button onClick={() => setCount((count) => count + 1)} disabled={isProcessing}>
-            Test Counter is: {count}
-          </button>
-        </p>
-        <p style={{ opacity: isProcessing ? 0.7 : 1 }}>
-          Edit <code>src/renderer/App.jsx</code> and save to test HMR updates.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ opacity: isProcessing ? 0.7 : 1 }}
-        >
-          Learn React
-        </a>
-      </header>
+          {imagePreviewUrl && (
+            <div className="image-preview-container">
+              <img
+                ref={imageRef}
+                src={imagePreviewUrl}
+                alt="Selected Preview"
+                className="main-image-preview"
+                onLoad={onImageLoad}
+              />
+            </div>
+          )}
+          {/* Temporary resize controls are now in the bottom bar, conditional on activeTool === 'Resize' */}
+        </div>
+      </div>
+
+      <div className="bottom-bar">
+        {renderBottomBarContent()}
+      </div>
+
+      {/* Test utilities - to be removed later */}
+      <div style={{ position: 'fixed', bottom: '5px', right: '5px', background: 'rgba(0,0,0,0.5)', padding: '5px', borderRadius: '3px', fontSize: '0.7em', display: 'none' }}>
+          <button onClick={handlePingBackend} disabled={isProcessing} style={{marginRight: '5px'}}>Ping Backend ({pingResponse})</button>
+          <button onClick={() => setCount((count) => count + 1)} disabled={isProcessing}>Counter: {count}</button>
+          {pingError && <p style={{color: 'red'}}>Error: {pingError}</p>}
+      </div>
     </div>
   );
 }
