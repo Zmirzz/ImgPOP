@@ -1,5 +1,65 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const { spawn } = require('child_process');
+
+const scriptsDir = path.join(__dirname, '../../python-ai-backend/cli');
+
+function runPython(scriptName, args = []) {
+  const scriptPath = path.join(scriptsDir, scriptName);
+  return new Promise((resolve, reject) => {
+    const py = spawn('python3', [scriptPath, ...args]);
+    let stdout = '';
+    let stderr = '';
+    py.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    py.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    py.on('close', (code) => {
+      if (code === 0) {
+        try {
+          resolve(JSON.parse(stdout.trim()));
+        } catch (e) {
+          resolve({ output: stdout.trim() });
+        }
+      } else {
+        reject(new Error(stderr.trim() || `Exited with code ${code}`));
+      }
+    });
+  });
+}
+
+// IPC handlers to invoke Python CLI wrappers
+ipcMain.handle('generative-fill', (event, opts) => {
+  const args = [opts.imagePath, opts.prompt || '', opts.maskPath || ''];
+  return runPython('generative_fill.py', args);
+});
+
+ipcMain.handle('remove-bg', (event, opts) => {
+  const args = [opts.imagePath];
+  return runPython('remove_bg.py', args);
+});
+
+ipcMain.handle('cleanup', (event, opts) => {
+  const args = [opts.imagePath, opts.maskPath || ''];
+  return runPython('cleanup.py', args);
+});
+
+ipcMain.handle('upscale', (event, opts) => {
+  const args = [opts.imagePath, String(opts.scale || 2)];
+  return runPython('upscale.py', args);
+});
+
+ipcMain.handle('extract-text', (event, opts) => {
+  const args = [opts.imagePath];
+  return runPython('extract_text.py', args);
+});
+
+ipcMain.handle('resize-image-local', (event, opts) => {
+  const args = [opts.imagePath, String(opts.width), String(opts.height), String(opts.expand)];
+  return runPython('resize_image.py', args);
+});
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
