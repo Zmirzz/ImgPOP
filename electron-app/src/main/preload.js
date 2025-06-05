@@ -2,25 +2,13 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Example: Expose a safe version of ipcRenderer to the renderer process
-// We aren't using this specific example yet, but it shows the pattern.
-/*
-contextBridge.exposeInMainWorld('electronAPI', {
-  send: (channel, data) => {
-    // whitelist channels
-    let validChannels = ['toMain'];
-    if (validChannels.includes(channel)) {
-      ipcRenderer.send(channel, data);
-    }
-  },
-  receive: (channel, func) => {
-    let validChannels = ['fromMain'];
-    if (validChannels.includes(channel)) {
-      // Deliberately strip event as it includes `sender`
-      ipcRenderer.on(channel, (event, ...args) => func(...args));
-    }
-  }
+contextBridge.exposeInMainWorld('backend', {
+  generativeFill: (opts) => ipcRenderer.invoke('generative-fill', opts),
+  removeBg: (opts) => ipcRenderer.invoke('remove-bg', opts),
+  cleanup: (opts) => ipcRenderer.invoke('cleanup', opts),
+  upscale: (opts) => ipcRenderer.invoke('upscale', opts),
+  extractText: (opts) => ipcRenderer.invoke('extract-text', opts),
+  resizeImageLocal: (opts) => ipcRenderer.invoke('resize-image-local', opts),
 });
-*/
 
-console.log('Preload script loaded.'); 
+console.log('Preload script loaded.');
